@@ -1,0 +1,277 @@
+<?xml version='1.0' encoding='utf-8' ?>
+
+<!-- ============================================================
+     RetailPulse — Tableau Workbook
+     Connects to PostgreSQL running in Docker on localhost:5432
+     
+     HOW TO USE:
+     1. Run: make up && make load-data
+     2. Open this file in Tableau Desktop (2022.1+)
+     3. When prompted, enter your DB password from .env
+     4. All 4 dashboards will populate automatically
+     ============================================================ -->
+
+<workbook source-build='2023.3.0' source-platform='win' version='21.4'
+          xmlns:user='http://www.tableausoftware.com/xml/user'>
+
+  <!-- ── Data Source: PostgreSQL via Docker ─────────────────── -->
+  <datasources>
+    <datasource caption='RetailPulse Sales' name='retailpulse_ds'
+                version='21.4'>
+
+      <connection authentication='username-password'
+                  class='postgres'
+                  dbname='retailpulse'
+                  minimum-driver-version='9.0'
+                  port='5432'
+                  schema='public'
+                  server='localhost'
+                  username='retailuser'>
+
+        <!-- Named queries map to materialized views for performance -->
+        <relation name='sales' table='[public].[sales]' type='table' />
+        <relation name='mv_monthly_revenue'
+                  table='[public].[mv_monthly_revenue]' type='table' />
+        <relation name='mv_product_performance'
+                  table='[public].[mv_product_performance]' type='table' />
+      </connection>
+
+      <!-- ── Column Metadata ──────────────────────────────────── -->
+      <column caption='Order Date'     datatype='date'    name='[order_date]'    role='dimension' type='ordinal' />
+      <column caption='Region'         datatype='string'  name='[region]'        role='dimension' type='nominal' />
+      <column caption='State'          datatype='string'  name='[state]'         role='dimension' type='nominal' />
+      <column caption='City'           datatype='string'  name='[city]'          role='dimension' type='nominal' />
+      <column caption='Category'       datatype='string'  name='[category]'      role='dimension' type='nominal' />
+      <column caption='Sub-Category'   datatype='string'  name='[sub_category]'  role='dimension' type='nominal' />
+      <column caption='Product Name'   datatype='string'  name='[product_name]'  role='dimension' type='nominal' />
+      <column caption='Segment'        datatype='string'  name='[segment]'       role='dimension' type='nominal' />
+      <column caption='Customer ID'    datatype='string'  name='[customer_id]'   role='dimension' type='nominal' />
+      <column caption='Order ID'       datatype='string'  name='[order_id]'      role='dimension' type='nominal' />
+
+      <column caption='Quantity'       datatype='integer' name='[quantity]'      role='measure'   type='quantitative' default-format='n0' />
+      <column caption='Unit Price'     datatype='real'    name='[unit_price]'    role='measure'   type='quantitative' default-format='$#,##0.00' />
+      <column caption='Discount'       datatype='real'    name='[discount]'      role='measure'   type='quantitative' default-format='0.0%' />
+      <column caption='Revenue'        datatype='real'    name='[revenue]'       role='measure'   type='quantitative' default-format='$#,##0' />
+      <column caption='Cost'           datatype='real'    name='[cost]'          role='measure'   type='quantitative' default-format='$#,##0' />
+      <column caption='Profit'         datatype='real'    name='[profit]'        role='measure'   type='quantitative' default-format='$#,##0' />
+
+      <!-- ── Calculated Fields ──────────────────────────────── -->
+      <column caption='Profit Margin %' datatype='real' name='[Profit Margin]'
+              role='measure' type='quantitative' default-format='0.00%'>
+        <calculation class='tableau' formula='[profit] / [revenue]' />
+      </column>
+
+      <column caption='Year' datatype='integer' name='[Year]'
+              role='dimension' type='ordinal'>
+        <calculation class='tableau' formula='YEAR([order_date])' />
+      </column>
+
+      <column caption='Month' datatype='integer' name='[Month]'
+              role='dimension' type='ordinal'>
+        <calculation class='tableau' formula='MONTH([order_date])' />
+      </column>
+
+      <column caption='Revenue per Order' datatype='real'
+              name='[Revenue per Order]' role='measure' type='quantitative'
+              default-format='$#,##0.00'>
+        <calculation class='tableau'
+          formula='SUM([revenue]) / COUNTD([order_id])' />
+      </column>
+    </datasource>
+  </datasources>
+
+  <!-- ── Worksheets ────────────────────────────────────────── -->
+  <worksheets>
+
+    <!-- Sheet 1: Revenue Trend (Line Chart) -->
+    <worksheet name='Monthly Revenue Trend'>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption='RetailPulse Sales' name='retailpulse_ds' />
+          </datasources>
+          <column-instance column='[order_date]' derivation='Month'
+                           name='[mn:order_date:qk]' pivot='key'
+                           type='quantitative' />
+          <column-instance column='[revenue]' name='[sum:revenue:qk]'
+                           pivot='key' type='quantitative' />
+          <column-instance column='[region]'  name='[none:region:nk]'
+                           pivot='key' type='nominal' />
+        </view>
+        <style>
+          <style-rule element='mark'>
+            <encoding attr='type'><map to='line' /></encoding>
+          </style-rule>
+          <style-rule element='header'>
+            <format attr='font-size' value='11' />
+          </style-rule>
+        </style>
+      </table>
+    </worksheet>
+
+    <!-- Sheet 2: Sales by Region (Bar Chart) -->
+    <worksheet name='Sales by Region'>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption='RetailPulse Sales' name='retailpulse_ds' />
+          </datasources>
+          <column-instance column='[region]'  name='[none:region:nk]'
+                           pivot='key' type='nominal' />
+          <column-instance column='[revenue]' name='[sum:revenue:qk]'
+                           pivot='key' type='quantitative' />
+          <column-instance column='[profit]'  name='[sum:profit:qk]'
+                           pivot='key' type='quantitative' />
+        </view>
+        <style>
+          <style-rule element='mark'>
+            <encoding attr='type'><map to='bar' /></encoding>
+          </style-rule>
+        </style>
+      </table>
+    </worksheet>
+
+    <!-- Sheet 3: Product Mix (Treemap) -->
+    <worksheet name='Product Category Mix'>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption='RetailPulse Sales' name='retailpulse_ds' />
+          </datasources>
+          <column-instance column='[category]'     name='[none:category:nk]'
+                           pivot='key' type='nominal' />
+          <column-instance column='[sub_category]' name='[none:sub_category:nk]'
+                           pivot='key' type='nominal' />
+          <column-instance column='[revenue]'      name='[sum:revenue:qk]'
+                           pivot='key' type='quantitative' />
+          <column-instance column='[Profit Margin]' name='[usr:Profit Margin:qk]'
+                           pivot='key' type='quantitative' />
+        </view>
+        <style>
+          <style-rule element='mark'>
+            <encoding attr='type'><map to='square' /></encoding>
+          </style-rule>
+        </style>
+      </table>
+    </worksheet>
+
+    <!-- Sheet 4: KPI Summary (Text/Numbers) -->
+    <worksheet name='KPI Summary'>
+      <table>
+        <view>
+          <datasources>
+            <datasource caption='RetailPulse Sales' name='retailpulse_ds' />
+          </datasources>
+          <column-instance column='[revenue]'       name='[sum:revenue:qk]'
+                           pivot='key' type='quantitative' />
+          <column-instance column='[profit]'        name='[sum:profit:qk]'
+                           pivot='key' type='quantitative' />
+          <column-instance column='[quantity]'      name='[sum:quantity:qk]'
+                           pivot='key' type='quantitative' />
+          <column-instance column='[order_id]'      name='[cntd:order_id:qk]'
+                           pivot='key' type='quantitative' />
+          <column-instance column='[Profit Margin]' name='[usr:Profit Margin:qk]'
+                           pivot='key' type='quantitative' />
+        </view>
+        <style>
+          <style-rule element='mark'>
+            <encoding attr='type'><map to='text' /></encoding>
+          </style-rule>
+        </style>
+      </table>
+    </worksheet>
+
+  </worksheets>
+
+  <!-- ── Dashboards ─────────────────────────────────────────── -->
+  <dashboards>
+
+    <!-- Dashboard 1: Sales Overview -->
+    <dashboard name='Sales Overview'>
+      <size maxheight='768' maxwidth='1366' minheight='768' minwidth='1366' />
+      <zones>
+        <zone h='100000' id='1' type='layout-basic' w='100000' x='0' y='0'>
+          <zone h='100000' id='2' param='horz' type='layout-flow'
+                w='100000' x='0' y='0'>
+            <zone h='100000' id='3' name='Monthly Revenue Trend'
+                  w='60000' x='0' y='0' />
+            <zone h='100000' id='4' name='Sales by Region'
+                  w='40000' x='60000' y='0' />
+          </zone>
+        </zone>
+      </zones>
+      <title>
+        <formatted-text>
+          <run bold='true' fontsize='16'>RetailPulse — Sales Overview</run>
+        </formatted-text>
+      </title>
+    </dashboard>
+
+    <!-- Dashboard 2: Regional Performance -->
+    <dashboard name='Regional Performance'>
+      <size maxheight='768' maxwidth='1366' minheight='768' minwidth='1366' />
+      <zones>
+        <zone h='100000' id='5' type='layout-basic' w='100000' x='0' y='0'>
+          <zone h='100000' id='6' name='Sales by Region'
+                w='100000' x='0' y='0' />
+        </zone>
+      </zones>
+      <title>
+        <formatted-text>
+          <run bold='true' fontsize='16'>Regional Performance</run>
+        </formatted-text>
+      </title>
+    </dashboard>
+
+    <!-- Dashboard 3: Product Mix -->
+    <dashboard name='Product Mix'>
+      <size maxheight='768' maxwidth='1366' minheight='768' minwidth='1366' />
+      <zones>
+        <zone h='100000' id='7' type='layout-basic' w='100000' x='0' y='0'>
+          <zone h='100000' id='8' name='Product Category Mix'
+                w='100000' x='0' y='0' />
+        </zone>
+      </zones>
+      <title>
+        <formatted-text>
+          <run bold='true' fontsize='16'>Product Mix Analysis</run>
+        </formatted-text>
+      </title>
+    </dashboard>
+
+    <!-- Dashboard 4: Executive Summary -->
+    <dashboard name='Executive Summary'>
+      <size maxheight='768' maxwidth='1366' minheight='768' minwidth='1366' />
+      <zones>
+        <zone h='100000' id='9' type='layout-basic' w='100000' x='0' y='0'>
+          <zone h='50000' id='10' param='vert' type='layout-flow'
+                w='100000' x='0' y='0'>
+            <zone h='30000' id='11' name='KPI Summary'
+                  w='100000' x='0' y='0' />
+            <zone h='70000' id='12' param='horz' type='layout-flow'
+                  w='100000' x='0' y='30000'>
+              <zone h='70000' id='13' name='Monthly Revenue Trend'
+                    w='60000' x='0' y='30000' />
+              <zone h='70000' id='14' name='Product Category Mix'
+                    w='40000' x='60000' y='30000' />
+            </zone>
+          </zone>
+        </zone>
+      </zones>
+      <title>
+        <formatted-text>
+          <run bold='true' fontsize='16'>Executive Summary Dashboard</run>
+        </formatted-text>
+      </title>
+    </dashboard>
+
+  </dashboards>
+
+  <!-- ── Window Layout ─────────────────────────────────────── -->
+  <windows>
+    <window class='dashboard' maximized='true' name='Executive Summary'>
+      <viewpoint />
+    </window>
+  </windows>
+
+</workbook>
