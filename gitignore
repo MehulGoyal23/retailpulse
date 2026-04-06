@@ -1,0 +1,49 @@
+# Environment
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker
+.docker/
+
+# Tableau cache/temp files
+*.twbx.cache
+*.hyper
+.tableau/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+.DS_Store?
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data (large files — use generate script instead)
+data/*.csv
+
+# Node (if any tooling is added)
+node_modules/
